@@ -78,7 +78,6 @@ def normalize_values(values):
         return {key: 0 for key in values}  # Handle the case where total is 0 to avoid division by zero
     return {key: round(value / total, 2) for key, value in values.items()}
 
-
 def generate_personality_profile():
     # Randomly select 3 items from each list
     selected_baseline = random.sample(baseline_list, 3)
@@ -99,42 +98,41 @@ def generate_personality_profile():
     
     # Create the profile object
     profile = {
-        "personality_profile": {
-            "description": "Personality profile used to influence the generation of conversational messages and engagement.",
-            "personality_quirk": { 
-                "description": "A single stand-out feature of this personality, to heavily influence the outcomes.",
-                "selected": chosen_quirk
-            },
-            "region": { 
-                "description": "The region of origin for this personality, to influence word choices, structure, and knowledge.",
-                "selected": chosen_region
-            },
-            "baseline_personality": {
-                "description": "Baseline personality traits that describe the general emotional and stylistic tendencies of the individual. Weights indicate overall influence on responses.",
-                "selected": baseline_weights
-            },
-            "personality_spike": {
-                "description": "Emotions or tones that might spike during specific moments in conversation, indicating transient or heightened emotional states. Weights influence how frequently this occurs.",
-                "selected": spike_occurrence
-            },
-            "topics_of_interest": {
-                "description": "Areas of interest that define the individual's hobbies and preferences, reflecting their engagement with various topics. Weights influence how frequently this comes up.",
-                "selected": interest_occurrence
-            }
+        "nickname": "",
+        "description": "Personality profile used to influence the generation of conversational messages and engagement.",
+        "personality_quirk": { 
+            "description": "A single stand-out feature of this personality, to heavily influence the outcomes.",
+            "selected": chosen_quirk
+        },
+        "region": { 
+            "description": "The region of origin for this personality, to influence word choices, structure, and knowledge.",
+            "selected": chosen_region
+        },
+        "baseline_personality": {
+            "description": "Baseline personality traits that describe the general emotional and stylistic tendencies of the individual. Weights indicate overall influence on responses.",
+            "selected": baseline_weights
+        },
+        "personality_spike": {
+            "description": "Emotions or tones that might spike during specific moments in conversation, indicating transient or heightened emotional states. Weights influence how frequently this occurs.",
+            "selected": spike_occurrence
+        },
+        "topics_of_interest": {
+            "description": "Areas of interest that define the individual's hobbies and preferences, reflecting their engagement with various topics. Weights influence how frequently this comes up.",
+            "selected": interest_occurrence
         }
     }
     
     return profile
 
-def output_to_json(profile, filename='personality_profile.json'):
-    with open(filename, 'w') as f:
-        json.dump(profile, f, indent=4)
+# def output_to_json(profile, filename='personality_profile.json'):
+#     with open(filename, 'w') as f:
+#         json.dump(profile, f, indent=4)
 
 def print_pretty_json(profile):
     print(json.dumps(profile, indent=4))
 
-def print_natural_language(profile):
-    profile_data = profile["personality_profile"]
+def print_natural_language(profile_data):
+    # profile_data = profile["personality_profile"]
     
     quirk = profile_data["personality_quirk"]["selected"]
     region = profile_data["region"]["selected"]
@@ -151,7 +149,7 @@ def print_natural_language(profile):
     interest_description = ", ".join(f"{item[0]}" for item in interests.items())
 
     description = (
-        f"This personality has a peculiar habit of {quirk}. It is associated with the region of {region}, "
+        f"{quirk}. It is associated with the region of {region}, "
         f"which influences its word choices, structure, and knowledge. The baseline emotions expressed by this personality "
         f"are most frequently {baseline_description}. Occasionally, it might display a {spike_description}, indicating heightened "
         f"emotional states during specific moments. The topics of interest for this personality include {interest_description}, "
@@ -162,6 +160,6 @@ def print_natural_language(profile):
 
 if __name__ == "__main__":
     profile = generate_personality_profile()
-    output_to_json(profile)
+    # output_to_json(profile)
     print_pretty_json(profile)
     print_natural_language(profile)

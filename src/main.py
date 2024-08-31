@@ -1,35 +1,42 @@
 #!/usr/bin/env python3
 
-import sys
 import os
-from openai.openai_api import call_openai  # Assuming this method exists in openai_helpers.py
+import platform
+import sys
 
-# Ensure the openai_helpers.py module can be found
-sys.path.append(os.path.join(os.path.dirname(__file__), 'openai'))
+def set_pythonpath():
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Points to 'package' directory
 
-def main():
-    # Ensure the correct number of arguments are provided
-    if len(sys.argv) != 5:
-        print("Usage: python personality_main.py <botSerial> <speechText> <intentName> <locale>")
-        sys.exit(1)
+    # Check the OS and set the appropriate PYTHONPATH
+    if platform.system() == 'Windows':
+        os.environ['PYTHONPATH'] = f"{project_root};{os.environ.get('PYTHONPATH', '')}"
+    else:  # Assume Linux/macOS
+        os.environ['PYTHONPATH'] = f"{project_root}:{os.environ.get('PYTHONPATH', '')}"
 
-    # Parse positional arguments
-    bot_serial = sys.argv[1]
-    speech_text = sys.argv[2]
-    intent_name = sys.argv[3]
-    locale = sys.argv[4]
+    # Optionally append to sys.path to ensure imports work in the current session
+    if project_root not in sys.path:
+        sys.path.append(project_root)
 
-    # Example debug logging (optional)
-    print(f"Bot Serial: {bot_serial}")
-    print(f"Speech Text: {speech_text}")
-    print(f"Intent Name: {intent_name}")
-    print(f"Locale: {locale}")
+# Call this function at the start of your script
+set_pythonpath()
 
-    # Call a method from openai_helpers.py (from the openai directory)
-    result = call_openai(bot_serial, speech_text, intent_name, locale)
+import argparse
+from request_handler import handle_request
 
-    # Output the result (or process it as needed)
-    print(result)
+# Ensure src directory is in the import path
+# sys.path.insert(0, 'src')
+
+def main(bot_serial, speech_text, intent_name, locale):
+    handle_request(bot_serial, speech_text, intent_name, locale)
+
+def parse_args(args):
+    parser = argparse.ArgumentParser(description="The main function to be called for Vector Personalities")
+    parser.add_argument("bot_id", help="The serial number of the Vector bot.")
+    parser.add_argument("speech_text", help="The text spoken and interpreted by the user")
+    parser.add_argument("intent", help="The name of the wirepod intent being called")
+    parser.add_argument("locale", help="The locale for the wirepod server")
+    return parser.parse_args(args)
 
 if __name__ == "__main__":
-    main()
+    args = parse_args(sys.argv[1:])
+    main(args.bot_id, args.speech_text, args.intent, args.locale)

@@ -2,285 +2,295 @@ import os
 import json
 import random
 import uuid
-import shutil
 from datetime import datetime
 
-# Track default region
-region = "en-us"
+# Hardcoded location variable
+LOCATION = "" #os.path.dirname(os.path.abspath(__file__))
+PERSONALITIES_FOLDER = os.path.join(LOCATION, 'personalities')
+BOT_MAPPING_FILE = os.path.join(PERSONALITIES_FOLDER, 'bot_mapping.json')
+PERSONALITY_IDS_FILE = os.path.join(PERSONALITIES_FOLDER, 'personality_ids.json')
+CONFIGS_FILE_PATH = os.path.join(LOCATION, "config", "configs.json")  #WORK ON THIS NEXT
 
-#region common
-def initialize(location):
-    personalities_path = os.path.join(location, 'personalities')
-    responses_path = os.path.join(personalities_path, 'responses', region)
+#region Initialization Functions
+def initialize_main():
+    # Ensure main personalities folder exists
+    create_folder(PERSONALITIES_FOLDER)
+    create_json_file(BOT_MAPPING_FILE)
+    create_json_file(PERSONALITY_IDS_FILE)
+    initialize_backup_folder()
 
-    create_folder(personalities_path)
-    create_folder(responses_path)
+def initialize_region(region):
+    region_path = os.path.join(PERSONALITIES_FOLDER, region)
+    create_folder(region_path)
+    return region_path 
 
+def initialize_bot(region, bot_id):
+    region_path = initialize_region(region)
+    bot_path = os.path.join(region_path, bot_id)
+    create_folder(bot_path)
+    return bot_path
+
+def initialize_bot_personality(region, bot_id, personality_id):
+    bot_path = initialize_bot(region, bot_id)
+    bot_personality_path = os.path.join(bot_path, personality_id)
+    create_folder(bot_personality_path)
+    create_json_file(os.path.join(bot_personality_path, "intent_index.json"))
+    return bot_personality_path
+    
+def initialize_backup_folder():
+    backup_folder_path = os.path.join(PERSONALITIES_FOLDER, 'backup')
+    create_folder(backup_folder_path)
+    return backup_folder_path
+#endregion
+
+#region Utility Functions
 def create_folder(path):
     if not os.path.exists(path):
         os.makedirs(path)
 
+def check_file_exists(file_path):
+    return os.path.exists(file_path)
+
 def create_json_file(file_path):
-    if not os.path.exists(file_path):
+    if not check_file_exists(file_path):
         with open(file_path, 'w') as f:
             json.dump({}, f)
 
-def update_json_file(file_path, data):
-    current_data = load_json_file(file_path)
-    current_data.update(data)
-    with open(file_path, 'w') as f:
-        json.dump(current_data, f, indent=4)
-
-def remove_file(file_path):
-    if os.path.exists(file_path):
-        os.remove(file_path)
-
 def load_json_file(file_path):
-    if not os.path.exists(file_path):
+    if not check_file_exists(file_path):
         return {}
     with open(file_path, 'r') as f:
         return json.load(f)
+
+def update_json_file(file_path, data):
+    current_data = load_json_file(file_path)
+    #TODO update this logic a bit more
+    if type(current_data) is list:
+        current_data = data
+    else:
+        current_data.update(data)
+    with open(file_path, 'w') as f:
+        json.dump(current_data, f, indent=4)
 #endregion
 
-#region response by bot
-def get_bot_response(bot_id, intent):
-    personality_id = get_bot_personality_id(bot_id)
-    if not personality_id:
-        return None
+#region Path Handlers
+def get_personalities_path(region, bot_id, personality_id):
+    return os.path.join(PERSONALITIES_FOLDER, region, bot_id, personality_id)
+
+def get_intent_index_path(region, bot_id, personality_id):
+    return os.path.join(get_personalities_path(region, bot_id, personality_id), 'intent_index.json')
+
+def get_response_file_path(region, bot_id, personality_id, response_id):
+    return os.path.join(get_personalities_path(region, bot_id, personality_id), f'{response_id}.json')
+
+def get_config_file_path():
+    return CONFIGS_FILE_PATH
+#endregion
+
+#region Config File
+def load_config_file():
+    if check_file_exists(CONFIGS_FILE_PATH):
+        with open(CONFIGS_FILE_PATH, 'r') as f:
+            return json.load(f)
+
+def get_custom_intents_file_path():
+    config = load_config_file()
+    if config.get('custom_intents_file_path'):
+        return config.get('custom_intents_file_path')
     
-    response = get_response(personality_id, intent)
-    return response
+def get_open_ai_key():
+    config = load_config_file()
+    if config.get('openai_api_key'):
+        return config.get('openai_api_key')
+    
+def get_custom_intents_file():
+    """
+    Returns: the loaded json
+    """
+    custom_intents_file_path = get_custom_intents_file_path()
+    if check_file_exists(custom_intents_file_path):
+        with open(custom_intents_file_path, 'r') as f:
+            return json.load(f)
+        
+def save_custom_intent(intent):
+    custom_intents = get_custom_intents_file()
+    custom_intents.append(intent)
+    update_json_file(get_custom_intents_file_path(), custom_intents)
 #endregion
 
-#region personality ids
-def get_bot_pesonality_id_mapping_path():
-    return os.path.join('personalities', 'bot_mapping.json')
+#region Personality Management
+# def list_personalities():
+#     personalities_path = os.path.join(LOCATION, 'personalities', 'personality_ids.json')
+#     personality_data = load_json_file(personalities_path)
+#     return [{"id": key, "name": value.get("short_name", "")} for key, value in personality_data.items()]
 
-def load_bot_mapping():
-    bot_mapping_path = get_bot_pesonality_id_mapping_path()
-    return load_json_file(bot_mapping_path)
+def get_personality(personality_id):
+    personality_data = load_json_file(PERSONALITY_IDS_FILE)
+    return personality_data.get(personality_id, None)
 
+def save_personality(personality_details):
+    personality_data = load_json_file(PERSONALITY_IDS_FILE)
+    new_id = uuid.uuid4().hex[:15]
+    
+    # make sure there are no uuid collisions
+    while new_id in personality_data:
+        new_id = uuid.uuid4().hex[:15]
+    
+    personality_data[new_id] = personality_details
+    update_json_file(PERSONALITY_IDS_FILE, personality_data)
+    return new_id
+
+# def update_personality(personality_id, updated_details):
+#     personality_ids_path = os.path.join(LOCATION, 'personalities', 'personality_ids.json')
+#     personality_data = load_json_file(personality_ids_path)
+#     personality_data[personality_id] = updated_details
+#     update_json_file(personality_ids_path, personality_data)
+
+# def remove_personality(personality_id):
+#     personalities_path = os.path.join(LOCATION, 'personalities', 'personality_ids.json')
+    
+#     # Load and back up the personality
+#     personality_data = load_json_file(personalities_path)
+#     removed_personality = personality_data.pop(personality_id, None)
+    
+#     if removed_personality:
+#         backup_path = os.path.join(LOCATION, 'backup', f"{personality_id}.json")
+#         create_folder(os.path.dirname(backup_path))
+#         with open(backup_path, 'w') as f:
+#             json.dump(removed_personality, f, indent=4)
+
+#     # Update the personality list
+#     update_json_file(personalities_path, personality_data)
+#endregion
+
+#region Bot Personality Mapping
 def get_bot_personality_id(bot_id):
-    bot_mapping = load_bot_mapping()
+    bot_mapping = load_json_file(BOT_MAPPING_FILE)
     return bot_mapping.get(bot_id, {}).get('personality_id', None)
 
-def get_bot_personality_history(bot_id):
-    bot_mapping = load_bot_mapping()
-    return bot_mapping.get(bot_id, {}).get('history', [])
+def get_bot_personality(bot_id):
+    bot_personality_id = get_bot_personality_id(bot_id)
+    return get_personality(bot_personality_id)
 
-def save_bot_personality(bot_id, personality_id):
-    bot_mapping_path = get_bot_pesonality_id_mapping_path()
-    bot_mapping = load_bot_mapping()
-    
-    previous_id = bot_mapping.get(bot_id, {}).get('personality_id', personality_id)
-    history_entry = {"date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "previous_id": previous_id}
+def save_bot_personality_mapping(bot_id, personality_id):
+    bot_mapping = load_json_file(BOT_MAPPING_FILE)
     
     if bot_id not in bot_mapping:
         bot_mapping[bot_id] = {"history": []}
     
+    previous_id = bot_mapping[bot_id].get('personality_id', None)
+    history_entry = {"date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "previous_id": previous_id}
+    
     bot_mapping[bot_id]['history'].append(history_entry)
     bot_mapping[bot_id]['personality_id'] = personality_id
     
-    update_json_file(bot_mapping_path, bot_mapping)
+    update_json_file(BOT_MAPPING_FILE, bot_mapping)
 #endregion
 
-#region personalities
-def get_personality(personality_id):
-    personality_ids_path = os.path.join('personalities', 'personality_ids.json')
-    personality_data = load_json_file(personality_ids_path)
-    return personality_data.get(personality_id, None)
+#region Intent and Response Management
+def get_response(region, bot_id, personality_id, intent):
+    # TODO: Increment the counter 
+    responses = get_responses(region, bot_id, personality_id, intent)
+    return random.choice(responses) if responses else None
 
-def list_personalities():
-    personality_ids_path = os.path.join('personalities', 'personality_ids.json')
-    personality_data = load_json_file(personality_ids_path)
-    return [{"id": key, "name": value.get("short_name", "")} for key, value in personality_data.items()]
+def check_intent_index_exists(region, bot_id, personality_id):
+    index_intent_path = get_intent_index_path(region, bot_id, personality_id)
+    if not check_file_exists(index_intent_path):
+        create_json_file(index_intent_path)
+    return index_intent_path
 
-def generate_guid():
-    return uuid.uuid4().hex[:15]
+def get_responses(region, bot_id, personality_id, intent):
+    index_data_path = check_intent_index_exists(region, bot_id, personality_id)
+    intent_index = load_json_file(index_data_path)
+    # I think we need to pick an intent at random here, and then proceed.
+    intent_id = intent_index.get(intent) #['response_file']
+    if intent_id:
+        response_file_id = intent_id['response_file']
+        response_file_path = get_response_file_path(region, bot_id, personality_id, response_file_id)
+        intent_index[intent]["times_used"] += 1
+        update_json_file(index_data_path, intent_index)
 
-def save_personality(personality_details):
-    personality_ids_path = os.path.join('personalities', 'personality_ids.json')
-    personality_data = load_json_file(personality_ids_path)
+        # response_file_path = get_response_file_path(region, bot_id, personality_id, intent_id)
+        responses = load_json_file(response_file_path).get("responses", [])
+        return responses # if responses else None
+    else:
+        return None
+
+def save_intent_responses(region, bot_id, personality_id, intents, responses):
+    response_file_id = uuid.uuid4().hex[:15]
+    response_file_path = get_response_file_path(region, bot_id, personality_id, response_file_id)
+
+    if not check_file_exists(response_file_path):
+        create_json_file(response_file_path)
+
+    # Append new responses to the file
+    response_data = load_json_file(response_file_path)
     
-    new_id = generate_guid()
-    while new_id in personality_data:
-        new_id = generate_guid()
+    if "responses" not in response_data:
+        response_data["responses"] = []
     
-    personality_data[new_id] = personality_details
-    update_json_file(personality_ids_path, personality_data)
-    return new_id
-
-def update_personality(personality_id, updated_details):
-    personality_ids_path = os.path.join('personalities', 'personality_ids.json')
-    personality_data = load_json_file(personality_ids_path)
-    personality_data[personality_id] = updated_details
-    update_json_file(personality_ids_path, personality_data)
-
-def remove_personality(personality_id):
-    personalities_path = os.path.join('personalities', 'personality_ids.json')
-    responses_folder = os.path.join('personalities', 'responses', region)
+    response_data["responses"].extend(responses)
+    update_json_file(response_file_path, response_data)
     
-    # Load and back up the personality
-    personality_data = load_json_file(personalities_path)
-    removed_personality = personality_data.pop(personality_id, None)
-    
-    if removed_personality:
-        backup_path = os.path.join(responses_folder, f"{personality_id}.json")
-        with open(backup_path, 'w') as f:
-            json.dump(removed_personality, f, indent=4)
+    # now update the index
+    index_data_path = get_intent_index_path(region, bot_id, personality_id)
+    if not check_file_exists(index_data_path):
+        create_json_file(index_data_path)
         
-        # Rename the personality folder
-        personality_folder = os.path.join(responses_folder, removed_personality.get("short_name", ""))
-        if os.path.exists(personality_folder):
-            shutil.move(personality_folder, f"{personality_folder}.REMOVED")
-        
-        # Remove from bot mappings
-        bot_mapping_path = os.path.join('personalities', 'bot_mapping.json')
-        bot_mapping = load_json_file(bot_mapping_path)
-        bot_mapping = {bot_id: details for bot_id, details in bot_mapping.items() if details['personality_id'] != personality_id}
-        update_json_file(bot_mapping_path, bot_mapping)
-
-    # Update the personality list
-    update_json_file(personalities_path, personality_data)
-#endregion
-
-#region responses
-def create_responses(personality_id, intent, responses):
-    responses_folder = os.path.join('personalities', 'responses', region, personality_id)
-    response_index_path = os.path.join(responses_folder, 'response_index.json')
+    index_data = load_json_file(index_data_path)
     
-    # Create folder and response_index.json if not present
-    create_folder(responses_folder)
-    create_json_file(response_index_path)
-    
-    response_index = load_json_file(response_index_path)
-    
-    # Check if intent already exists
-    if intent not in response_index:
-        # Create a new intent file
-        safe_intent_name = f"intent_{intent.replace(' ', '_').lower()}.json"
-        intent_file_path = os.path.join(responses_folder, safe_intent_name)
-        create_json_file(intent_file_path)
-        
-        # Update the response_index
-        response_index[intent] = {
-            "file_path": safe_intent_name,
-            "index_key": "responses",
+    for intent in intents:
+        index_data[intent] = {
+            "response_file": response_file_id,
             "times_used": 0
         }
     
-    # Append responses to the intent file
-    intent_file_path = os.path.join(responses_folder, response_index[intent]["file_path"])
-    intent_data = load_json_file(intent_file_path)
+    update_json_file(index_data_path, index_data)
     
-    if "responses" not in intent_data:
-        intent_data["responses"] = []
-    
-    intent_data["responses"].extend(responses)
-    update_json_file(intent_file_path, intent_data)
-    update_json_file(response_index_path, response_index)
+    return response_file_id
 
-def list_responses(personality_id: str, intent):
-    responses_folder = os.path.join('personalities', 'responses', region, personality_id)
-    response_index_path = os.path.join(responses_folder, 'response_index.json')
+# def update_intent_mapping(bot_id, intent, region, response_file_id):
+#     intent_index_path = get_intent_index_path(bot_id, region)
+#     create_json_file(intent_index_path)
     
-    response_index = load_json_file(response_index_path)
-    if intent in response_index:
-        intent_file_path = os.path.join(responses_folder, response_index[intent]["file_path"])
-        intent_data = load_json_file(intent_file_path)
-        return intent_data.get("responses", [])
+#     intent_index = load_json_file(intent_index_path)
+#     intent_index[intent] = {
+#         "response_file": response_file_id,
+#         "times_used": 0
+#     }
     
-    return []
-
-def get_response(personality_id, intent):
-    responses_folder = os.path.join('personalities', 'responses', region, personality_id)
-    response_index_path = os.path.join(responses_folder, 'response_index.json')
-    
-    response_index = load_json_file(response_index_path)
-    if intent in response_index:
-        intent_file_path = os.path.join(responses_folder, response_index[intent]["file_path"])
-        intent_data = load_json_file(intent_file_path)
-        responses = intent_data.get("responses", [])
-        
-        if responses:
-            selected_response = random.choice(responses)
-            response_index[intent]["times_used"] += 1
-            update_json_file(response_index_path, response_index)
-            return selected_response
-    
-    return None
-
-def remove_intent(personality_id, intent):
-    responses_folder = os.path.join('personalities', 'responses', region, personality_id)
-    response_index_path = os.path.join(responses_folder, 'response_index.json')
-    removed_folder = os.path.join(responses_folder, 'REMOVED')
-
-    create_folder(removed_folder)
-    
-    response_index = load_json_file(response_index_path)
-    
-    if intent in response_index:
-        # Move the intent file to REMOVED folder
-        intent_file_path = os.path.join(responses_folder, response_index[intent]["file_path"])
-        removed_file_path = os.path.join(removed_folder, os.path.basename(intent_file_path))
-        
-        if os.path.exists(removed_file_path):
-            removed_file_path = os.path.join(removed_folder, f"{intent}_{personality_id}_REMOVED.json")
-        
-        shutil.move(intent_file_path, removed_file_path)
-        response_index.pop(intent)
-        update_json_file(response_index_path, response_index)
+#     update_json_file(intent_index_path, intent_index)
 #endregion
 
-if __name__ == "__main__":
-    # Example usage
-    target_location = os.path.dirname(os.path.abspath(__file__))
-    initialize(target_location)
-    
-    bot_id = "sbv1234"
-    intent = "greeting"
-    responses = ["Hello!", "Hi there!", "Greetings!"]
-    
-    # Check if personality exists; if not, create it
-    existing_personality_id = get_bot_personality_id(bot_id)
-    if not existing_personality_id:
-        # Define new personality object
-        new_personality = {
-            "short_name": "FriendlyBot",
-            "details": {
-                "personality_profile": {
-                    "description": "Friendly and curious personality.",
-                    "personality_quirk": {
-                        "description": "A single stand-out feature.",
-                        "selected": "Loves asking questions"
-                    },
-                    "region": {
-                        "description": "Region of origin.",
-                        "selected": "en_us"
-                    },
-                    "baseline_personality": {
-                        "description": "Baseline personality traits.",
-                        "selected": {
-                            "Curious": 0.75,
-                            "Happy": 0.8
-                        }
-                    }
-                }
-            }
-        }
-        personality_id = save_personality(new_personality)
-        save_bot_personality(bot_id, personality_id)
-    else:
-        personality_id = existing_personality_id
-    
-    # Check if responses for the intent exist; if not, create them
-    if not list_responses(personality_id, intent):
-        create_responses(personality_id, intent, responses)
-    
-    # Example of getting a response
-    response = get_response(personality_id, intent)
-    print(f"Selected response: {response}")
+#region Example Usage
+# if __name__ == "__main__":
+#     bot_id = "example_bot_001"
+#     region = "en_us"
+#     intent = "greeting"
+#     responses = ["Hello!", "Hi there!", "Greetings!"]
 
-    # Example of getting a bot response
-    response2 = get_bot_response(bot_id, intent)
-    print(f"Bot response: {response2}")
+#     # Ensure paths exist
+#     create_folder(get_personalities_path(bot_id, region))
+    
+#     # Check if intent exists
+#     if not check_intent_exists(bot_id, intent, region):
+#         # Save the responses and update intent mapping
+#         response_file_id = save_intent_responses(bot_id, intent, region, responses)
+#         update_intent_mapping(bot_id, intent, region, response_file_id)
+    
+#     # Fetch a random response for the intent
+#     random_response = get_random_response(bot_id, intent, region)
+#     print(f"Random response: {random_response}")
+    
+#     # Manage personalities
+#     new_personality = {
+#         "short_name": "CuriousBot",
+#         "description": "A curious and friendly personality."
+#     }
+#     personality_id = save_personality(new_personality)
+#     print(f"Saved personality with ID: {personality_id}")
+    
+#     # Get bot personality ID and update it
+#     current_personality_id = get_bot_personality_id(bot_id)
+#     save_bot_personality(bot_id, personality_id)
+#endregion
