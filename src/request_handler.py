@@ -53,13 +53,13 @@ def create_new_response(bot_serial, speech_text, intent_name, locale, bot_person
     
     return results
 
-if __name__ == "__main__":
-    # create_new_response("0aa12345", "what do you think of me now", "override_unhandled_for_personalities", "en_US", "")
-    personality = """
-This personality has a peculiar habit of quoting lines from 1980s action movies, and is from the United States. 
-Generally, it is calm and grateful. Occasionally, it might display a frivolous tone, especially during specific 
-moments. The topic of entertainment is 92% likely to come up.
-"""
-    results = generate_responses_from_openai(personality, "what do you think of me now")
-    print(results)
+# if __name__ == "__main__":
+#     # create_new_response("0aa12345", "what do you think of me now", "override_unhandled_for_personalities", "en_US", "")
+#     personality = """
+# This personality has a peculiar habit of quoting lines from 1980s action movies, and is from the United States. 
+# Generally, it is calm and grateful. Occasionally, it might display a frivolous tone, especially during specific 
+# moments. The topic of entertainment is 92% likely to come up.
+# """
+#     results = generate_responses_from_openai(personality, "what do you think of me now")
+#     print(results)
 

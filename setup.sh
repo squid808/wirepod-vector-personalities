@@ -38,12 +38,45 @@ cp "$CHIPPER_JSON" "$BACKUP_DIR"
 echo "Backup created in $BACKUP_DIR."
 
 # Step 4: Update customIntents.json with new intent
-new_entry=$(jq -n \
+new_entries=$(jq -n \
   --arg exec "$PYTHON_ENV_PATH" \
   --arg execpath "$DEFAULT_EXEC_PATH" \
-  '{name: "override_system_unmatched_for_personalities", description: "This overrides the unmatched intent, to direct to wirepod-vector-personalities.", utterances: [""], intent: "intent_system_unmatched", params: {paramname: "", paramvalue: ""}, exec: $exec, execargs: [$execpath, "!botSerial", "!speechText", "!intentName", "!locale"], issystem: false, luascript: ""}')
-jq ". += [$new_entry]" "$CHIPPER_JSON" > "$CHIPPER_JSON.tmp" && mv "$CHIPPER_JSON.tmp" "$CHIPPER_JSON"
-echo "Added new intent to $CHIPPER_JSON."
+  '[{
+    "name": "create vector personality",
+    "description": "Create a personality for your vector, by way of wirepod-vector-personalities.",
+    "utterances": ["create a personality", "create personality", "create your personality", "new personality"],
+    "intent": "intent_create_personality",
+    "params": {"paramname": "", "paramvalue": ""},
+    "exec": $exec,
+    "execargs": [$execpath, "!botSerial", "!speechText", "!intentName", "!locale"],
+    "issystem": false,
+    "luascript": ""
+  }, {
+    "name": "get vector personality",
+    "description": "Get the current personality for your vector, by way of wirepod-vector-personalities.",
+    "utterances": ["what'\''s your personality", "what is your personality", "tell me your personality", "get personality"],
+    "intent": "intent_get_personality",
+    "params": {"paramname": "", "paramvalue": ""},
+    "exec": $exec,
+    "execargs": [$execpath, "!botSerial", "!speechText", "!intentName", "!locale"],
+    "issystem": false,
+    "luascript": ""
+  }, {
+    "name": "override_system_unmatched_for_personalities",
+    "description": "This overrides the unmatched intent, to direct to wirepod-vector-personalities.",
+    "utterances": [""],
+    "intent": "intent_system_unmatched",
+    "params": {"paramname": "", "paramvalue": ""},
+    "exec": $exec,
+    "execargs": [$execpath, "!botSerial", "!speechText", "!intentName", "!locale"],
+    "issystem": false,
+    "luascript": ""
+  }]')
+
+# Append new entries to customIntents.json
+jq ". += $new_entries" "$CHIPPER_JSON" > "$CHIPPER_JSON.tmp" && mv "$CHIPPER_JSON.tmp" "$CHIPPER_JSON"
+echo "Added new intents to $CHIPPER_JSON."
+
 
 # Step 5: Prompt for OpenAI API key
 read -p "Enter your OpenAI API key (leave blank to skip): " openai_key

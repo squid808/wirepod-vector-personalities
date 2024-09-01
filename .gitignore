@@ -162,3 +162,5 @@ cython_debug/
 #.idea/
 
 config/openai_key.json
+.vscode/
+personalities/

@@ -158,8 +158,8 @@ def print_natural_language(profile_data):
     
     print(description)
 
-if __name__ == "__main__":
-    profile = generate_personality_profile()
-    # output_to_json(profile)
-    print_pretty_json(profile)
-    print_natural_language(profile)
+# if __name__ == "__main__":
+#     profile = generate_personality_profile()
+#     # output_to_json(profile)
+#     print_pretty_json(profile)
+#     print_natural_language(profile)
